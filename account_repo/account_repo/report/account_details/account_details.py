@@ -1277,7 +1277,7 @@
 
 
 
-from frappe.utils import flt
+
 from __future__ import unicode_literals
 import frappe
 from frappe.utils import get_link_to_form
@@ -1303,6 +1303,9 @@ def execute(filters=None):
     columns = [
         {"label": "Document Type", "fieldname": "doctype", "fieldtype": "Data", "width": 150},
         {"label": "Document / Item / Payment", "fieldname": "doc_name", "fieldtype": "Data", "width": 300, "filterable": 1,"in_standard_filter": 1},
+      {"label": "Reference Doc", "fieldname": "reference_doc", "fieldtype": "Data", "width": 250},
+
+
                 {"label": "Debit", "fieldname": "debit", "fieldtype": "Currency", "options": "currency", "width": 120},
         {"label": "Credit", "fieldname": "credit", "fieldtype": "Currency", "options": "currency", "width": 120},
         {"label": "Grand Total", "fieldname": "grand_total", "fieldtype": "Currency", "options": "currency", "width": 120},
@@ -1312,17 +1315,21 @@ def execute(filters=None):
         {"label": "Amount", "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 120},
         {"label": "Account", "fieldname": "account", "fieldtype": "Link", "options": "Account", "width": 200},
 
-        # {"label": "Total Debit", "fieldname": "total_debit", "fieldtype": "Currency", "options": "currency", "width": 120},
-        # {"label": "Total Credit", "fieldname": "total_credit", "fieldtype": "Currency", "options": "currency", "width": 120},
         {"label": "GL Entry", "fieldname": "gl_entry", "fieldtype": "Data", "width": 250},
 
          {"label": "Currency", "fieldname": "currency", "fieldtype": "Link", "options": "Currency", "width": 100},
-        # {"label": "Selling Price List", "fieldname": "selling_price_list", "fieldtype": "Link", "options": "Price List", "width": 150},
+
         {"label": "Exchange Rate", "fieldname": "exchange_rate", "fieldtype": "Float", "width": 100},
-        {"label": "Amount (Currency)", "fieldname": "amount_currency", "fieldtype": "Currency", "width": 120},
-        {"label": "Amount (Local)", "fieldname": "amount_local", "fieldtype": "Currency", "width": 120},
-        {"label": "Amount (Reporting)", "fieldname": "amount_reporting", "fieldtype": "Currency", "width": 120},
-        {"label": "Amount (Transaction)", "fieldname": "amount_transaction", "fieldtype": "Currency", "width": 120},
+       
+
+        {"label": "Amount (Currency)",
+ "fieldname": "amount_currency",
+ "fieldtype": "Currency",
+ "options": "currency",
+ "width": 120},
+        {"label": "Amount (Local)", "fieldname": "amount_local", "fieldtype": "Currency","options": "currency", "width": 120},
+        {"label": "Amount (Reporting)", "fieldname": "amount_reporting", "fieldtype": "Currency","options": "currency", "width": 120},
+        {"label": "Amount (Transaction)", "fieldname": "amount_transaction", "fieldtype": "Currency","options": "currency", "width": 120},
        
 
 
@@ -1405,34 +1412,13 @@ def execute(filters=None):
             total_debit = rec.get("total_debit")
             total_credit = rec.get("total_credit")
 
-            # Currency and Exchange Rate
-            # currency = rec.get("currency") if doctype == "Sales Order" else None
             currency = rec.get("currency") if doctype in ["Sales Order", "Purchase Order"] else None
 
             selling_price_list = rec.get("selling_price_list") if doctype == "Sales Order" else None
             txn_date = rec.get("transaction_date") if doctype == "Sales Order" else None
 
             exchange_rate = None
-            # amount_currency = grand_total or 0
-            # amount_local = amount_reporting = amount_transaction = None
-
-            # if currency and txn_date:
-            #     default_currency = frappe.get_cached_value('Company', frappe.db.get_default('company'), 'default_currency')
-            #     exchange_rate = frappe.get_value("Currency Exchange", {
-            #         "from_currency": currency,
-            #         "to_currency": default_currency,
-            #         "date": ["<=", txn_date]
-            #     }, "exchange_rate", order_by="date desc") or 1
-
-            # if doctype in ["Sales Order", "Purchase Order"]:
-            #    exchange_rate = rec.get("conversion_rate") or 1
-            # else:
-            #     exchange_rate = 1
-
-
-            #     amount_local = amount_currency * exchange_rate
-            #     amount_reporting = amount_local
-            #     amount_transaction = amount_currency
+       
 
             amount_currency = grand_total or 0
             if doctype in ["Sales Order", "Purchase Order"]:
@@ -1451,11 +1437,29 @@ def execute(filters=None):
                 amount_reporting = amount_local
                 amount_transaction = amount_local
 
-
             if grand_total:
                 doc_totals[doctype] += grand_total
             elif total_debit:
                 doc_totals[doctype] += total_debit   
+
+
+            reference_doc = None
+
+            if doctype in ["Sales Invoice", "Purchase Invoice", "Purchase Receipt", "Delivery Note"]:
+                child_table = {
+                    "Sales Invoice": ("Sales Invoice Item", "sales_order"),
+                    "Purchase Invoice": ("Purchase Invoice Item", "purchase_order"),
+                    "Purchase Receipt": ("Purchase Receipt Item", "sales_order"),
+                    "Delivery Note": ("Delivery Note Item", "against_sales_order")
+                }
+
+                item_table, reference_field = child_table[doctype]
+                references = frappe.get_all(item_table, filters={"parent": name}, fields=[reference_field])
+                
+                # Collect non-empty unique references
+                ref_set = set([r[reference_field] for r in references if r.get(reference_field)])
+                reference_doc = ", ".join(ref_set) if ref_set else None
+    
 
             base_row = {
                 "doctype": doctype,
@@ -1485,11 +1489,25 @@ def execute(filters=None):
                 "amount_local": amount_local,
                 "amount_reporting": amount_reporting,
                 "amount_transaction": amount_transaction,
+                "reference_doc": reference_doc,
                 "indent": 0
             }
             data.append(base_row)
 
+    
             for gle in gl_map.get((doctype, name), []):
+                sign = ""
+                if gle.debit and gle.debit > 0:
+                    sign = "+"
+                elif gle.credit and gle.credit > 0:
+                    sign = "-"
+
+                # Use grand_total if available, else use debit or credit as fallback
+                base_amount = gle.debit if gle.debit > 0 else gle.credit or 0
+
+                # Sign-prefixed amounts
+                signed_amount = float(f"{sign}{base_amount}") if sign else base_amount
+
                 data.append({
                     "doctype": doctype,
                     "doc_name": f"GL Entry: {gle.account}",
@@ -1497,8 +1515,38 @@ def execute(filters=None):
                     "debit": gle.debit,
                     "credit": gle.credit,
                     "gl_entry": get_link_to_form("GL Entry", gle.name),
+                    "amount_currency": signed_amount,
+                    "amount_local": signed_amount,
+                    "amount_reporting": signed_amount,
+                    "amount_transaction": signed_amount,
                     "indent": 1
-                })  
+                })
+
+
+            # Fetch Payment Entries linked to this document
+            payment_refs = frappe.get_all("Payment Entry Reference",
+                fields=["parent"],
+                filters={
+                    "reference_doctype": doctype,
+                    "reference_name": name,
+                    "docstatus": 1
+                }
+            )
+
+            for pref in payment_refs:
+                payment_entry = frappe.get_doc("Payment Entry", pref.parent)
+                data.append({
+                    "doctype": "Payment Entry",
+                    "doc_name": f"Payment Entry: {payment_entry.name}",
+                    "reference_doc": name,  # Add Reference Doc column
+                    "grand_total": payment_entry.paid_amount,
+                    "account": payment_entry.paid_from if payment_entry.payment_type == "Receive" else payment_entry.paid_to,
+                    "amount_currency": payment_entry.paid_amount,
+                    "txn_date": payment_entry.posting_date,
+                    "cheque_no": payment_entry.reference_no,
+                    "cheque_date": payment_entry.reference_date,
+                    "indent": 1
+                })    
 
     chart = {
         "data": {
@@ -1519,62 +1567,6 @@ def execute(filters=None):
             if frappe.db.get_default('company') else ""
     }]
 
-
-
-    # if filters and filters.get("doc_name"):
-    #     keyword = filters["doc_name"].lower()
-    #     filtered_data = []
-
-    #     for row in data:
-    #         # Check both parent and child levels
-    #         if isinstance(row.get("doc_name"), str) and keyword in row["doc_name"].lower():
-    #             filtered_data.append(row)
-
-    #         # Optional: Include parent if any of its children matched (more logic needed here)
-    #     data = filtered_data
-
-    # if filters and filters.get("doc_name"):
-    #     keyword = filters["doc_name"].lower()
-    #     final_data = []
-    #     added_parents = set()
-    #     parent_children_map = {}
-
-    #     # Build map of parent -> child rows
-    #     for row in data:
-    #         if row.get("indent", 0) == 0:
-    #             parent_key = row.get("doc_name")
-    #             parent_children_map[parent_key] = {"parent": row, "children": []}
-    #         else:
-    #             parent_key = None
-    #             for parent in parent_children_map:
-    #                 if row.get("doctype") == parent_children_map[parent]["parent"].get("doctype") and \
-    #                 row.get("gl_entry") and parent in row.get("gl_entry"):
-    #                     parent_key = parent
-    #                     break
-    #             if parent_key:
-    #                 parent_children_map[parent_key]["children"].append(row)
-
-    #     # Find matches and build final_data
-    #     for parent_key, group in parent_children_map.items():
-    #         parent = group["parent"]
-    #         children = group["children"]
-
-    #         parent_text = str(parent.get("doc_name", "")).lower()
-    #         match_parent = keyword in parent_text
-
-    #         match_children = [child for child in children if keyword in str(child.get("doc_name", "")).lower()]
-
-    #         if match_parent or match_children:
-    #             if parent_key not in added_parents:
-    #                 final_data.append(parent)
-    #                 added_parents.add(parent_key)
-    #             # Add all children if parent matches, or only matching children if child matched
-    #             if match_parent:
-    #                 final_data.extend(children)
-    #             else:
-    #                 final_data.extend(match_children)
-
-    #     data = final_data
 
     return columns, data, None, chart, report_summary
     
