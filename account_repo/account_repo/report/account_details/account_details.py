@@ -1519,6 +1519,7 @@ def execute(filters=None):
                     "amount_local": signed_amount,
                     "amount_reporting": signed_amount,
                     "amount_transaction": signed_amount,
+                        "currency": currency,
                     "indent": 1
                 })
 
@@ -1545,6 +1546,7 @@ def execute(filters=None):
                     "txn_date": payment_entry.posting_date,
                     "cheque_no": payment_entry.reference_no,
                     "cheque_date": payment_entry.reference_date,
+                        "currency": payment_entry.paid_currency,
                     "indent": 1
                 })    
 
