@@ -1385,6 +1385,8 @@ def execute(filters=None):
             fields.append("rounded_total")
         if "outstanding_amount" in available_fields:
             fields.append("outstanding_amount")
+        if "currency" in available_fields:
+            fields.append("currency")
         if doctype == "Journal Entry":
             fields += ["total_debit", "total_credit"]
         # if doctype == "Sales Order":
