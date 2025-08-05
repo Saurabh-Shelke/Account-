@@ -1412,7 +1412,7 @@ def execute(filters=None):
             total_debit = rec.get("total_debit")
             total_credit = rec.get("total_credit")
 
-            currency = rec.get("currency") if doctype in ["Sales Order", "Purchase Order"] else None
+            currency = rec.get("currency") 
 
             selling_price_list = rec.get("selling_price_list") if doctype == "Sales Order" else None
             txn_date = rec.get("transaction_date") if doctype == "Sales Order" else None
