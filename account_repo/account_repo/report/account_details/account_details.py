@@ -1387,6 +1387,10 @@ def execute(filters=None):
             fields.append("outstanding_amount")
         if "currency" in available_fields:
             fields.append("currency")
+        if "conversion_rate" in available_fields:
+            fields.append("conversion_rate")
+        if "transaction_date" in available_fields:
+            fields.append("transaction_date")
         if doctype == "Journal Entry":
             fields += ["total_debit", "total_credit"]
         # if doctype == "Sales Order":
@@ -1415,6 +1419,10 @@ def execute(filters=None):
             total_credit = rec.get("total_credit")
 
             currency = rec.get("currency") 
+
+            if not currency:
+                currency = frappe.get_cached_value('Company', frappe.db.get_default('company'), 'default_currency')
+
 
             selling_price_list = rec.get("selling_price_list") if doctype == "Sales Order" else None
             txn_date = rec.get("transaction_date") if doctype == "Sales Order" else None
@@ -1521,7 +1529,7 @@ def execute(filters=None):
                     "amount_local": signed_amount,
                     "amount_reporting": signed_amount,
                     "amount_transaction": signed_amount,
-                        "currency": gle.transaction_currency,
+                    "currency": gle.transaction_currency,
                     "indent": 1
                 })
 
