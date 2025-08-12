@@ -1,6 +1,15 @@
 frappe.query_reports["Account Details"] = {
     filters: [
         {
+			fieldname: "company",
+			label: __("Company"),
+			fieldtype: "Link",
+			width: "80",
+			options: "Company",
+			reqd: 1,
+			default: frappe.defaults.get_default("company"),
+		},
+        {
             fieldname: "from_date",
             label: "From Date",
             fieldtype: "Date",
@@ -13,6 +22,22 @@ frappe.query_reports["Account Details"] = {
             fieldtype: "Date",
             default: frappe.datetime.get_today(),
             reqd: 1
-        }
+        },
+        {
+            fieldname: "doctype_filter",
+            label: "Doctypes",
+            fieldtype: "MultiSelect",
+            options: [
+              "Sales Invoice",
+              "Purchase Invoice",
+              "Journal Entry",
+              "Purchase Receipt",
+              "Delivery Note",
+              "Sales Order",
+              "Purchase Order",
+              "Expense Claim",
+            ].join("\n"),
+            default: ""
+          },
     ]
 };
