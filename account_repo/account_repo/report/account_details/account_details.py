@@ -2489,6 +2489,7 @@ def execute(filters=None):
                     "indent": 1,
                 })
 
+                
     chart = {
         "data": {
             "labels": list(doc_totals.keys()),
@@ -2509,7 +2510,6 @@ def execute(filters=None):
     }]
 
     return columns, data, None, chart, report_summary
-
 
 
 
