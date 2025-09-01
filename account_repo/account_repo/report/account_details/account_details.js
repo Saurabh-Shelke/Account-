@@ -1,14 +1,12 @@
 frappe.query_reports["Account Details"] = {
     filters: [
-        {
-			fieldname: "company",
-			label: __("Company"),
-			fieldtype: "Link",
-			width: "80",
-			options: "Company",
-			reqd: 1,
-			default: frappe.defaults.get_default("company"),
-		},
+        { fieldname: "company",
+            label: __("Company"),
+            fieldtype: "Link",
+            width: "80",
+            options: "Company",
+            reqd: 1,
+            default: frappe.defaults.get_default("company"), },
         {
             fieldname: "from_date",
             label: "From Date",
